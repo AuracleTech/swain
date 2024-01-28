@@ -1,0 +1,19 @@
+use std::time::{Duration, Instant};
+
+const UPDATE_TICK_RATE_PER_SEC: u64 = 1000;
+const UPDATE_TICK_RATE_DURATION: Duration = Duration::from_millis(1000 / UPDATE_TICK_RATE_PER_SEC);
+
+let _handle = std::thread::spawn(move || loop {
+    let tick_start = Instant::now();
+
+    update();
+
+    let elapsed = tick_start.elapsed();
+    if elapsed > UPDATE_TICK_RATE_DURATION {
+        println!("We're late: {} ms", elapsed.as_millis());
+        println!("SHOULD NOT HAPPEN, IT WOULD MEAN WE MISSED A FRAME");
+    } else {
+        let sleep_duration = UPDATE_TICK_RATE_DURATION - elapsed;
+        std::thread::sleep(sleep_duration);
+    }
+});
