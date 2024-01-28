@@ -266,10 +266,7 @@ fn create_swapchain_khr(
             min_image_count: std::cmp::max(2, surface_caps.min_image_count),
             image_format: format,
             image_color_space: vk::ColorSpaceKHR::SRGB_NONLINEAR,
-            image_extent: vk::Extent2D {
-                width: width,
-                height: height,
-            },
+            image_extent: vk::Extent2D { width, height },
             image_array_layers: 1,
             image_usage: vk::ImageUsageFlags::COLOR_ATTACHMENT,
             queue_family_index_count: 1,
@@ -313,7 +310,7 @@ pub fn create_swapchain(
     family_index: u32,
     old_swapchain: vk::SwapchainKHR,
 ) -> Swapchain {
-    let swapchain_khr = create_swapchain_khr(
+    let swapchain = create_swapchain_khr(
         &swapchain_loader,
         surface,
         &surface_caps,
@@ -324,7 +321,7 @@ pub fn create_swapchain(
         old_swapchain,
     );
 
-    let images = get_swapchain_images(swapchain_khr, &swapchain_loader);
+    let images = get_swapchain_images(swapchain, &swapchain_loader);
 
     let mut image_views: Vec<vk::ImageView> = Vec::with_capacity(images.len());
     for image in &images {
@@ -333,15 +330,13 @@ pub fn create_swapchain(
         image_views.push(image_view);
     }
 
-    let swapchain = Swapchain {
-        swapchain: swapchain_khr,
-        images: images,
-        image_views: image_views,
-        width: width,
-        height: height,
-    };
-
-    swapchain
+    Swapchain {
+        swapchain,
+        images,
+        image_views,
+        width,
+        height,
+    }
 }
 
 fn create_image_view(

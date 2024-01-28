@@ -14,8 +14,8 @@ pub fn engine(win_title: &'static str, win_init_width: u32, win_init_height: u32
     let window = WindowBuilder::new()
         .with_title(win_title)
         .with_inner_size(winit::dpi::LogicalSize::new(
-            f64::from(win_init_width),
-            f64::from(win_init_height),
+            win_init_width,
+            win_init_height,
         ))
         .build(&event_loop)
         .unwrap();
@@ -44,8 +44,8 @@ pub fn engine(win_title: &'static str, win_init_width: u32, win_init_height: u32
         surface,
         &surface_caps,
         swapchain_format,
-        window.inner_size().width,
-        window.inner_size().height,
+        win_init_width,
+        win_init_height,
         graphics_family_index,
         vk::SwapchainKHR::null(),
     );
@@ -94,60 +94,68 @@ pub fn engine(win_title: &'static str, win_init_width: u32, win_init_height: u32
 
             match event {
                 Event::WindowEvent {
-                    event:
-                        WindowEvent::CloseRequested
-                        | WindowEvent::KeyboardInput {
-                            input:
-                                KeyboardInput {
-                                    state: ElementState::Pressed,
-                                    virtual_keycode: Some(VirtualKeyCode::Escape),
-                                    ..
-                                },
-                            ..
-                        },
-                    ..
-                } => *control_flow = ControlFlow::Exit,
+                    event: win_event, ..
+                } => match win_event {
+                    WindowEvent::CloseRequested => {
+                        *control_flow = ControlFlow::Exit;
+                    }
+                    WindowEvent::KeyboardInput {
+                        input:
+                            KeyboardInput {
+                                state: ElementState::Pressed,
+                                virtual_keycode: Some(VirtualKeyCode::Escape),
+                                ..
+                            },
+                        ..
+                    } => *control_flow = ControlFlow::Exit,
+                    WindowEvent::Resized(new_size) => {
+                        println!("Resized to {:?}", new_size);
+
+                        if new_size.width <= 0 || new_size.height <= 0 {
+                            return;
+                        }
+
+                        if swapchain.width != new_size.width || swapchain.height != new_size.height
+                        {
+                            device.device_wait_idle().unwrap();
+
+                            for image_view in &swapchain.image_views {
+                                device.destroy_image_view(*image_view, None);
+                            }
+
+                            let old_swapchain_khr = swapchain.swapchain;
+                            swapchain = engine::create_swapchain(
+                                &device,
+                                &swapchain_loader,
+                                surface,
+                                &surface_caps,
+                                swapchain_format,
+                                new_size.width,
+                                new_size.height,
+                                graphics_family_index,
+                                swapchain.swapchain,
+                            );
+
+                            swapchain_loader.destroy_swapchain(old_swapchain_khr, None);
+
+                            for i in 0..framebuffers.len() {
+                                device.destroy_framebuffer(framebuffers[i], None);
+
+                                framebuffers[i] = engine::create_framebuffer(
+                                    &device,
+                                    swapchain.image_views[i],
+                                    render_pass,
+                                    new_size.width,
+                                    new_size.height,
+                                );
+                            }
+                        }
+                    }
+                    _ => (),
+                },
                 Event::RedrawRequested(_) => {
                     if window.inner_size().width <= 0 || window.inner_size().height <= 0 {
                         return;
-                    }
-
-                    let width = window.inner_size().width;
-                    let height = window.inner_size().height;
-
-                    if swapchain.width != width || swapchain.height != height {
-                        device.device_wait_idle().unwrap();
-
-                        for image_view in &swapchain.image_views {
-                            device.destroy_image_view(*image_view, None);
-                        }
-
-                        let old_swapchain_khr = swapchain.swapchain;
-                        swapchain = engine::create_swapchain(
-                            &device,
-                            &swapchain_loader,
-                            surface,
-                            &surface_caps,
-                            swapchain_format,
-                            width,
-                            height,
-                            graphics_family_index,
-                            swapchain.swapchain,
-                        );
-
-                        swapchain_loader.destroy_swapchain(old_swapchain_khr, None);
-
-                        for i in 0..framebuffers.len() {
-                            device.destroy_framebuffer(framebuffers[i], None);
-
-                            framebuffers[i] = engine::create_framebuffer(
-                                &device,
-                                swapchain.image_views[i],
-                                render_pass,
-                                swapchain.width,
-                                swapchain.height,
-                            );
-                        }
                     }
 
                     device
