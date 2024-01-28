@@ -344,49 +344,6 @@ pub fn create_swapchain(
     swapchain
 }
 
-pub fn resize_swapchain_if_changed(
-    swapchain: &mut Swapchain,
-    device: &ash::Device,
-    swapchain_loader: &khr::Swapchain,
-    surface: vk::SurfaceKHR,
-    surface_caps: &vk::SurfaceCapabilitiesKHR,
-    format: vk::Format,
-    width: u32,
-    height: u32,
-    family_index: u32,
-) -> bool {
-    unsafe {
-        let mut resized = false;
-
-        if swapchain.width != width || swapchain.height != height {
-            device.device_wait_idle().unwrap();
-
-            for image_view in &swapchain.image_views {
-                device.destroy_image_view(*image_view, None);
-            }
-
-            let old_swapchain_khr = swapchain.swapchain;
-            *swapchain = create_swapchain(
-                device,
-                swapchain_loader,
-                surface,
-                surface_caps,
-                format,
-                width,
-                height,
-                family_index,
-                swapchain.swapchain,
-            );
-
-            swapchain_loader.destroy_swapchain(old_swapchain_khr, None);
-
-            resized = true;
-        }
-
-        resized
-    }
-}
-
 fn create_image_view(
     device: &ash::Device,
     image: vk::Image,

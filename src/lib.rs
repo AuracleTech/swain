@@ -112,17 +112,31 @@ pub fn engine(win_title: &'static str, win_init_width: u32, win_init_height: u32
                         return;
                     }
 
-                    if engine::resize_swapchain_if_changed(
-                        &mut swapchain,
-                        &device,
-                        &swapchain_loader,
-                        surface,
-                        &surface_caps,
-                        swapchain_format,
-                        window.inner_size().width,
-                        window.inner_size().height,
-                        graphics_family_index,
-                    ) {
+                    let width = window.inner_size().width;
+                    let height = window.inner_size().height;
+
+                    if swapchain.width != width || swapchain.height != height {
+                        device.device_wait_idle().unwrap();
+
+                        for image_view in &swapchain.image_views {
+                            device.destroy_image_view(*image_view, None);
+                        }
+
+                        let old_swapchain_khr = swapchain.swapchain;
+                        swapchain = engine::create_swapchain(
+                            &device,
+                            &swapchain_loader,
+                            surface,
+                            &surface_caps,
+                            swapchain_format,
+                            width,
+                            height,
+                            graphics_family_index,
+                            swapchain.swapchain,
+                        );
+
+                        swapchain_loader.destroy_swapchain(old_swapchain_khr, None);
+
                         for i in 0..framebuffers.len() {
                             device.destroy_framebuffer(framebuffers[i], None);
 
@@ -189,7 +203,7 @@ pub fn engine(win_title: &'static str, win_init_width: u32, win_init_height: u32
 
                     let clear_values = [vk::ClearValue {
                         color: vk::ClearColorValue {
-                            float32: [0.2, 0.4, 0.6, 0.0],
+                            float32: [0.4, 0.2, 0.8, 0.0],
                         },
                     }];
 
