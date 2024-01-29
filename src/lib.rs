@@ -88,6 +88,7 @@ pub fn engine(win_title: &'static str, win_init_width: u32, win_init_height: u32
     );
 
     let mut frame_index = 0;
+    let mut update_presentation = false;
     unsafe {
         event_loop.run(move |event, _, control_flow| {
             *control_flow = ControlFlow::Poll;
@@ -108,54 +109,52 @@ pub fn engine(win_title: &'static str, win_init_width: u32, win_init_height: u32
                             },
                         ..
                     } => *control_flow = ControlFlow::Exit,
-                    WindowEvent::Resized(new_size) => {
-                        println!("Resized to {:?}", new_size);
-
-                        if new_size.width <= 0 || new_size.height <= 0 {
-                            return;
-                        }
-
-                        if swapchain.width != new_size.width || swapchain.height != new_size.height
-                        {
-                            device.device_wait_idle().unwrap();
-
-                            for image_view in &swapchain.image_views {
-                                device.destroy_image_view(*image_view, None);
-                            }
-
-                            let old_swapchain_khr = swapchain.swapchain;
-                            swapchain = engine::create_swapchain(
-                                &device,
-                                &swapchain_loader,
-                                surface,
-                                &surface_caps,
-                                swapchain_format,
-                                new_size.width,
-                                new_size.height,
-                                graphics_family_index,
-                                swapchain.swapchain,
-                            );
-
-                            swapchain_loader.destroy_swapchain(old_swapchain_khr, None);
-
-                            for i in 0..framebuffers.len() {
-                                device.destroy_framebuffer(framebuffers[i], None);
-
-                                framebuffers[i] = engine::create_framebuffer(
-                                    &device,
-                                    swapchain.image_views[i],
-                                    render_pass,
-                                    new_size.width,
-                                    new_size.height,
-                                );
-                            }
-                        }
-                    }
                     _ => (),
                 },
                 Event::RedrawRequested(_) => {
-                    if window.inner_size().width <= 0 || window.inner_size().height <= 0 {
+                    let width = window.inner_size().width;
+                    let height = window.inner_size().height;
+
+                    if width <= 0 || height <= 0 {
                         return;
+                    }
+
+                    if swapchain.width != width || swapchain.height != height || update_presentation
+                    {
+                        device.device_wait_idle().unwrap();
+
+                        for image_view in &swapchain.image_views {
+                            device.destroy_image_view(*image_view, None);
+                        }
+
+                        let old_swapchain_khr = swapchain.swapchain;
+                        swapchain = engine::create_swapchain(
+                            &device,
+                            &swapchain_loader,
+                            surface,
+                            &surface_caps,
+                            swapchain_format,
+                            width,
+                            height,
+                            graphics_family_index,
+                            swapchain.swapchain,
+                        );
+
+                        swapchain_loader.destroy_swapchain(old_swapchain_khr, None);
+
+                        for i in 0..framebuffers.len() {
+                            device.destroy_framebuffer(framebuffers[i], None);
+
+                            framebuffers[i] = engine::create_framebuffer(
+                                &device,
+                                swapchain.image_views[i],
+                                render_pass,
+                                swapchain.width,
+                                swapchain.height,
+                            );
+                        }
+
+                        update_presentation = false;
                     }
 
                     device
@@ -321,11 +320,12 @@ pub fn engine(win_title: &'static str, win_init_width: u32, win_init_height: u32
                         ..Default::default()
                     };
 
-                    swapchain_loader
-                        .queue_present(graphics_queue, &present_info)
-                        .unwrap();
-
-                    frame_index = (frame_index + 1) % 2;
+                    match swapchain_loader.queue_present(graphics_queue, &present_info) {
+                        Ok(_) => frame_index = (frame_index + 1) % 2,
+                        Err(vk::Result::ERROR_OUT_OF_DATE_KHR)
+                        | Err(vk::Result::SUBOPTIMAL_KHR) => update_presentation = true,
+                        Err(err) => panic!("Failed to present image: {:?}", err),
+                    }
                 }
                 _ => (),
             }

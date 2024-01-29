@@ -260,13 +260,25 @@ fn create_swapchain_khr(
 ) -> vk::SwapchainKHR {
     unsafe {
         let composite_alpha = get_surface_composite_alpha(&surface_caps);
+        // TEST
+        // CHANGE
+        let image_extent = vk::Extent2D {
+            width: width.clamp(
+                surface_caps.min_image_extent.width,
+                surface_caps.max_image_extent.width,
+            ),
+            height: height.clamp(
+                surface_caps.min_image_extent.height,
+                surface_caps.max_image_extent.height,
+            ),
+        };
 
         let create_info = vk::SwapchainCreateInfoKHR {
             surface: surface,
             min_image_count: std::cmp::max(2, surface_caps.min_image_count),
             image_format: format,
             image_color_space: vk::ColorSpaceKHR::SRGB_NONLINEAR,
-            image_extent: vk::Extent2D { width, height },
+            image_extent: image_extent,
             image_array_layers: 1,
             image_usage: vk::ImageUsageFlags::COLOR_ATTACHMENT,
             queue_family_index_count: 1,
@@ -278,11 +290,9 @@ fn create_swapchain_khr(
             ..Default::default()
         };
 
-        let swapchain = swapchain_loader
+        swapchain_loader
             .create_swapchain(&create_info, None)
-            .expect("Can't create Vulkan swapchain.");
-
-        swapchain
+            .expect("Can't create Vulkan swapchain.")
     }
 }
 
@@ -373,22 +383,22 @@ pub fn create_framebuffer(
     width: u32,
     height: u32,
 ) -> vk::Framebuffer {
+    let attachments = [image_view];
+
     unsafe {
         let framebuffer_create_info = vk::FramebufferCreateInfo {
             render_pass: render_pass,
             attachment_count: 1,
-            p_attachments: &image_view,
-            width: width,
-            height: height,
+            p_attachments: attachments.as_ptr(),
+            width,
+            height,
             layers: 1,
             ..Default::default()
         };
 
-        let framebuffer = device
+        device
             .create_framebuffer(&framebuffer_create_info, None)
-            .expect("Can't create Vulkan framebuffer.");
-
-        framebuffer
+            .expect("Can't create Vulkan framebuffer.")
     }
 }
 
