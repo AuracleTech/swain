@@ -44,8 +44,6 @@ pub fn engine(win_title: &'static str, win_init_width: u32, win_init_height: u32
         surface,
         &surface_caps,
         swapchain_format,
-        win_init_width,
-        win_init_height,
         graphics_family_index,
         vk::SwapchainKHR::null(),
     );
@@ -67,8 +65,8 @@ pub fn engine(win_title: &'static str, win_init_width: u32, win_init_height: u32
             &device,
             *image_view,
             render_pass,
-            swapchain.width,
-            swapchain.height,
+            win_init_width,
+            win_init_height,
         );
 
         framebuffers.push(framebuffer);
@@ -119,8 +117,7 @@ pub fn engine(win_title: &'static str, win_init_width: u32, win_init_height: u32
                         return;
                     }
 
-                    if swapchain.width != width || swapchain.height != height || update_presentation
-                    {
+                    if update_presentation {
                         device.device_wait_idle().unwrap();
 
                         for image_view in &swapchain.image_views {
@@ -134,8 +131,6 @@ pub fn engine(win_title: &'static str, win_init_width: u32, win_init_height: u32
                             surface,
                             &surface_caps,
                             swapchain_format,
-                            width,
-                            height,
                             graphics_family_index,
                             swapchain.swapchain,
                         );
@@ -149,8 +144,8 @@ pub fn engine(win_title: &'static str, win_init_width: u32, win_init_height: u32
                                 &device,
                                 swapchain.image_views[i],
                                 render_pass,
-                                swapchain.width,
-                                swapchain.height,
+                                width,
+                                height,
                             );
                         }
 
@@ -219,10 +214,7 @@ pub fn engine(win_title: &'static str, win_init_width: u32, win_init_height: u32
                         framebuffer: framebuffers[image_index as usize],
                         render_area: vk::Rect2D {
                             offset: vk::Offset2D { x: 0, y: 0 },
-                            extent: vk::Extent2D {
-                                width: swapchain.width,
-                                height: swapchain.height,
-                            },
+                            extent: vk::Extent2D { width, height },
                         },
                         clear_value_count: clear_values.len() as u32,
                         p_clear_values: clear_values.as_ptr(),
@@ -238,17 +230,14 @@ pub fn engine(win_title: &'static str, win_init_width: u32, win_init_height: u32
                     let viewport = vk::Viewport {
                         x: 0.0,
                         y: 0.0,
-                        width: swapchain.width as f32,
-                        height: swapchain.height as f32,
+                        width: width as f32,
+                        height: height as f32,
                         min_depth: 0.0,
                         max_depth: 1.0,
                     };
                     let scissor = vk::Rect2D {
                         offset: vk::Offset2D { x: 0, y: 0 },
-                        extent: vk::Extent2D {
-                            width: swapchain.width,
-                            height: swapchain.height,
-                        },
+                        extent: vk::Extent2D { width, height },
                     };
 
                     device.cmd_set_viewport(command_buffers[frame_index], 0, &[viewport]);

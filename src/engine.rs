@@ -11,9 +11,6 @@ pub struct Swapchain {
     pub swapchain: vk::SwapchainKHR,
     pub images: Vec<vk::Image>,
     pub image_views: Vec<vk::ImageView>,
-
-    pub width: u32,
-    pub height: u32,
 }
 
 pub fn create_instance(entry: &ash::Entry) -> ash::Instance {
@@ -253,24 +250,26 @@ fn create_swapchain_khr(
     surface: vk::SurfaceKHR,
     surface_caps: &vk::SurfaceCapabilitiesKHR,
     format: vk::Format,
-    width: u32,
-    height: u32,
     family_index: u32,
     old_swapchain: vk::SwapchainKHR,
 ) -> vk::SwapchainKHR {
     unsafe {
         let composite_alpha = get_surface_composite_alpha(&surface_caps);
-        // TEST
-        // CHANGE
+        // // TEST
+        // // CHANGE
+        // let image_extent = vk::Extent2D {
+        //     width: width.clamp(
+        //         surface_caps.min_image_extent.width,
+        //         surface_caps.max_image_extent.width,
+        //     ),
+        //     height: height.clamp(
+        //         surface_caps.min_image_extent.height,
+        //         surface_caps.max_image_extent.height,
+        //     ),
+        // };
         let image_extent = vk::Extent2D {
-            width: width.clamp(
-                surface_caps.min_image_extent.width,
-                surface_caps.max_image_extent.width,
-            ),
-            height: height.clamp(
-                surface_caps.min_image_extent.height,
-                surface_caps.max_image_extent.height,
-            ),
+            width: surface_caps.current_extent.width,
+            height: surface_caps.current_extent.height,
         };
 
         let create_info = vk::SwapchainCreateInfoKHR {
@@ -315,8 +314,6 @@ pub fn create_swapchain(
     surface: vk::SurfaceKHR,
     surface_caps: &vk::SurfaceCapabilitiesKHR,
     format: vk::Format,
-    width: u32,
-    height: u32,
     family_index: u32,
     old_swapchain: vk::SwapchainKHR,
 ) -> Swapchain {
@@ -325,8 +322,6 @@ pub fn create_swapchain(
         surface,
         &surface_caps,
         format,
-        width,
-        height,
         family_index,
         old_swapchain,
     );
@@ -344,8 +339,6 @@ pub fn create_swapchain(
         swapchain,
         images,
         image_views,
-        width,
-        height,
     }
 }
 
