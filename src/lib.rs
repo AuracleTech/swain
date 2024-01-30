@@ -239,7 +239,7 @@ impl Engine {
         }
     }
 
-    pub unsafe fn update(&mut self) {
+    pub unsafe fn update_presentation(&mut self) {
         self.device.device_wait_idle().unwrap();
 
         for image_view in &self.presentation.swapchain.image_views {
@@ -486,7 +486,7 @@ impl Engine {
                 Ok(_) => {
                     self.command_buffer_index = (self.command_buffer_index + 1) % 2;
                 }
-                Err(vk::Result::ERROR_OUT_OF_DATE_KHR) => self.update(),
+                Err(vk::Result::ERROR_OUT_OF_DATE_KHR) => self.update_presentation(),
                 Err(error) => panic!("Can't present queue: {:?}", error),
             }
         }
