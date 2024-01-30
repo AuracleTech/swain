@@ -275,7 +275,7 @@ impl Engine {
         }
     }
 
-    pub fn draw_routine(&mut self) {
+    pub fn draw(&mut self) {
         let width = self.presentation.surface_caps.current_extent.width;
         let height = self.presentation.surface_caps.current_extent.height;
 
@@ -673,14 +673,15 @@ pub fn get_swapchain_format(
     }
 }
 
-fn create_swapchain_khr(
+fn create_swapchain(
+    device: &ash::Device,
     swapchain_loader: &khr::Swapchain,
     surface: vk::SurfaceKHR,
     surface_caps: &vk::SurfaceCapabilitiesKHR,
     format: vk::Format,
     family_index: u32,
     old_swapchain: vk::SwapchainKHR,
-) -> vk::SwapchainKHR {
+) -> Swapchain {
     unsafe {
         let composite_alpha = get_surface_composite_alpha(&surface_caps);
         let image_extent = vk::Extent2D {
@@ -705,9 +706,24 @@ fn create_swapchain_khr(
             ..Default::default()
         };
 
-        swapchain_loader
+        let swapchain = swapchain_loader
             .create_swapchain(&create_info, None)
-            .expect("Can't create Vulkan swapchain.")
+            .expect("Can't create Vulkan swapchain.");
+
+        let images = get_swapchain_images(swapchain, &swapchain_loader);
+
+        let mut image_views: Vec<vk::ImageView> = Vec::with_capacity(images.len());
+        for image in &images {
+            let image_view = create_image_view(device, *image, format);
+
+            image_views.push(image_view);
+        }
+
+        Swapchain {
+            swapchain,
+            images,
+            image_views,
+        }
     }
 }
 
@@ -721,40 +737,6 @@ fn get_swapchain_images(
             .expect("Can't get Vulkan swapchain images.");
 
         swapchain_images
-    }
-}
-
-pub fn create_swapchain(
-    device: &ash::Device,
-    swapchain_loader: &khr::Swapchain,
-    surface: vk::SurfaceKHR,
-    surface_caps: &vk::SurfaceCapabilitiesKHR,
-    format: vk::Format,
-    family_index: u32,
-    old_swapchain: vk::SwapchainKHR,
-) -> Swapchain {
-    let swapchain = create_swapchain_khr(
-        &swapchain_loader,
-        surface,
-        &surface_caps,
-        format,
-        family_index,
-        old_swapchain,
-    );
-
-    let images = get_swapchain_images(swapchain, &swapchain_loader);
-
-    let mut image_views: Vec<vk::ImageView> = Vec::with_capacity(images.len());
-    for image in &images {
-        let image_view = create_image_view(device, *image, format);
-
-        image_views.push(image_view);
-    }
-
-    Swapchain {
-        swapchain,
-        images,
-        image_views,
     }
 }
 

@@ -29,7 +29,7 @@ fn main() {
                 _ => (),
             },
             Event::MainEventsCleared => window.request_redraw(),
-            Event::RedrawRequested(_) => engine.draw_routine(),
+            Event::RedrawRequested(_) => engine.draw(),
             _ => (),
         }
     });
