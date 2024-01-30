@@ -1,7 +1,7 @@
 use ash::extensions::khr;
 use ash::vk;
 use winit::event_loop::EventLoop;
-use winit::window::WindowBuilder;
+use winit::window::{Window, WindowBuilder};
 
 use std::ffi::CStr;
 
@@ -18,7 +18,7 @@ pub struct Presentation {
     surface: vk::SurfaceKHR,
     surface_caps: vk::SurfaceCapabilitiesKHR,
     format: vk::Format,
-    family_index: u32,
+    queue_family_index: u32,
     swapchain_loader: khr::Swapchain,
     swapchain: Swapchain,
     image_available_semaphore: vk::Semaphore,
@@ -28,27 +28,30 @@ pub struct Presentation {
 
 impl Presentation {
     pub fn new(
-        entry: &ash::Entry,
+        surface_loader: khr::Surface,
+        surface: vk::SurfaceKHR,
         instance: &ash::Instance,
         physical_device: vk::PhysicalDevice,
         device: &ash::Device,
-        graphics_family_index: u32,
-        surface: vk::SurfaceKHR,
+        queue_family_index: u32,
         image_available_semaphore: vk::Semaphore,
         render_finished_semaphore: vk::Semaphore,
     ) -> Self {
-        let surface_loader = khr::Surface::new(&entry, &instance);
-        let surface_caps = get_surface_capabilities(physical_device, surface, &surface_loader);
+        let surface_caps = unsafe {
+            surface_loader
+                .get_physical_device_surface_capabilities(physical_device, surface)
+                .expect("Can't get Vulkan surface capabilities.")
+        };
         let format = get_swapchain_format(physical_device, surface, &surface_loader);
         let swapchain_loader = khr::Swapchain::new(&instance, &device);
 
         let swapchain = create_swapchain(
-            &device,
             &swapchain_loader,
             surface,
+            &device,
             &surface_caps,
             format,
-            graphics_family_index,
+            queue_family_index,
             vk::SwapchainKHR::null(),
         );
 
@@ -57,7 +60,7 @@ impl Presentation {
             surface,
             surface_caps,
             format,
-            family_index: graphics_family_index,
+            queue_family_index,
             swapchain_loader,
             swapchain,
             image_available_semaphore,
@@ -76,8 +79,6 @@ pub struct Swapchain {
 pub struct Engine {
     _instance: ash::Instance,
     _entry: ash::Entry,
-    _surface_loader: khr::Surface,
-    surface: vk::SurfaceKHR,
     _physical_device: vk::PhysicalDevice,
     device: ash::Device,
     graphics_queue: vk::Queue,
@@ -98,7 +99,7 @@ impl Engine {
         win_title: &str,
         win_init_width: u32,
         win_init_height: u32,
-    ) -> (Self, winit::window::Window, EventLoop<()>) {
+    ) -> (Self, Window, EventLoop<()>) {
         // SECTION : Create window
         let event_loop = EventLoop::new();
         let window = WindowBuilder::new()
@@ -157,26 +158,26 @@ impl Engine {
 
             // SECTION : Pick physical device
             let physical_device = pick_physical_device(&instance, surface, &surface_loader);
-            let graphics_family_index = get_graphics_family_index(&instance, physical_device);
+            let queue_family_index = get_graphics_family_index(&instance, physical_device);
 
-            let device = create_device(&instance, physical_device, graphics_family_index);
+            let device = create_device(&instance, physical_device, queue_family_index);
 
-            let graphics_queue = device.get_device_queue(graphics_family_index, 0);
+            let graphics_queue = device.get_device_queue(queue_family_index, 0);
 
             // SECTION : Create swapchain
             let presentation = Presentation::new(
-                &entry,
+                surface_loader,
+                surface,
                 &instance,
                 physical_device,
                 &device,
-                graphics_family_index,
-                surface,
+                queue_family_index,
                 create_semaphore(&device),
                 create_semaphore(&device),
             );
 
             // SECTION : Create command pool
-            let command_pool = create_command_pool(&device, graphics_family_index);
+            let command_pool = create_command_pool(&device, queue_family_index);
 
             // SECTION : Create command buffers
             let command_buffers = allocate_command_buffers(&device, command_pool, 2);
@@ -209,8 +210,6 @@ impl Engine {
             let mut engine = Engine {
                 _instance: instance,
                 _entry: entry,
-                _surface_loader: surface_loader,
-                surface,
                 _physical_device: physical_device,
                 device,
                 graphics_queue,
@@ -239,7 +238,7 @@ impl Engine {
         }
     }
 
-    pub unsafe fn update_presentation(&mut self) {
+    pub unsafe fn update_presentation(&mut self, window: &Window) {
         self.device.device_wait_idle().unwrap();
 
         for image_view in &self.presentation.swapchain.image_views {
@@ -248,12 +247,12 @@ impl Engine {
 
         let old_swapchain_khr = self.presentation.swapchain.swapchain;
         self.presentation.swapchain = create_swapchain(
-            &self.device,
             &self.presentation.swapchain_loader,
-            self.surface,
+            self.presentation.surface,
+            &self.device,
             &self.presentation.surface_caps,
             self.presentation.format,
-            self.presentation.family_index,
+            self.presentation.queue_family_index,
             self.presentation.swapchain.swapchain,
         );
 
@@ -275,7 +274,7 @@ impl Engine {
         }
     }
 
-    pub fn draw(&mut self) {
+    pub fn draw(&mut self, window: &Window) {
         let width = self.presentation.surface_caps.current_extent.width;
         let height = self.presentation.surface_caps.current_extent.height;
 
@@ -486,7 +485,7 @@ impl Engine {
                 Ok(_) => {
                     self.command_buffer_index = (self.command_buffer_index + 1) % 2;
                 }
-                Err(vk::Result::ERROR_OUT_OF_DATE_KHR) => self.update_presentation(),
+                Err(vk::Result::ERROR_OUT_OF_DATE_KHR) => self.update_presentation(&window),
                 Err(error) => panic!("Can't present queue: {:?}", error),
             }
         }
@@ -513,18 +512,6 @@ fn get_surface_composite_alpha(
         return vk::CompositeAlphaFlagsKHR::POST_MULTIPLIED;
     } else {
         return vk::CompositeAlphaFlagsKHR::INHERIT;
-    }
-}
-
-pub fn get_surface_capabilities(
-    physical_device: vk::PhysicalDevice,
-    surface: vk::SurfaceKHR,
-    surface_loader: &khr::Surface,
-) -> vk::SurfaceCapabilitiesKHR {
-    unsafe {
-        surface_loader
-            .get_physical_device_surface_capabilities(physical_device, surface)
-            .expect("Can't get Vulkan surface capabilities.")
     }
 }
 
@@ -670,9 +657,9 @@ pub fn get_swapchain_format(
 }
 
 fn create_swapchain(
-    device: &ash::Device,
     swapchain_loader: &khr::Swapchain,
     surface: vk::SurfaceKHR,
+    device: &ash::Device,
     surface_caps: &vk::SurfaceCapabilitiesKHR,
     format: vk::Format,
     family_index: u32,
