@@ -161,7 +161,7 @@ impl Engine {
 
             let device = create_device(&instance, physical_device, graphics_family_index);
 
-            let graphics_queue = get_device_queue(&device, graphics_family_index);
+            let graphics_queue = device.get_device_queue(graphics_family_index, 0);
 
             // SECTION : Create swapchain
             let presentation = Presentation::new(
@@ -641,10 +641,6 @@ pub fn create_device(
 
         device
     }
-}
-
-pub fn get_device_queue(device: &ash::Device, family_index: u32) -> vk::Queue {
-    unsafe { device.get_device_queue(family_index, 0) }
 }
 
 pub fn get_swapchain_format(
