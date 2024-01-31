@@ -36,6 +36,8 @@ impl Presentation {
         queue_family_index: u32,
         image_available_semaphore: vk::Semaphore,
         render_finished_semaphore: vk::Semaphore,
+        width: u32,
+        height: u32,
     ) -> Self {
         let surface_caps = unsafe {
             surface_loader
@@ -53,6 +55,8 @@ impl Presentation {
             format,
             queue_family_index,
             vk::SwapchainKHR::null(),
+            width,
+            height,
         );
 
         Presentation {
@@ -77,9 +81,9 @@ pub struct Swapchain {
 }
 
 pub struct Engine {
-    _instance: ash::Instance,
-    _entry: ash::Entry,
-    _physical_device: vk::PhysicalDevice,
+    instance: ash::Instance,
+    entry: ash::Entry,
+    physical_device: vk::PhysicalDevice,
     device: ash::Device,
     graphics_queue: vk::Queue,
     presentation: Presentation,
@@ -174,6 +178,8 @@ impl Engine {
                 queue_family_index,
                 create_semaphore(&device),
                 create_semaphore(&device),
+                window.inner_size().width,
+                window.inner_size().height,
             );
 
             // SECTION : Create command pool
@@ -208,9 +214,9 @@ impl Engine {
 
             // SECTION : Create engine
             let mut engine = Engine {
-                _instance: instance,
-                _entry: entry,
-                _physical_device: physical_device,
+                instance,
+                entry,
+                physical_device,
                 device,
                 graphics_queue,
                 presentation,
@@ -224,54 +230,61 @@ impl Engine {
             };
 
             // SECTION : Create framebuffers
-            for image_view in &engine.presentation.swapchain.image_views {
-                engine.presentation.framebuffers.push(create_framebuffer(
-                    &engine.device,
-                    *image_view,
-                    engine.render_pass,
-                    engine.presentation.surface_caps.current_extent.width,
-                    engine.presentation.surface_caps.current_extent.height,
-                ));
-            }
+            engine.create_framebuffers();
 
             (engine, window, event_loop)
         }
     }
 
+    fn create_framebuffers(&mut self) {
+        for image_view in &self.presentation.swapchain.image_views {
+            self.presentation.framebuffers.push(create_framebuffer(
+                &self.device,
+                *image_view,
+                self.render_pass,
+                self.presentation.surface_caps.current_extent.width,
+                self.presentation.surface_caps.current_extent.height,
+            ));
+        }
+    }
+
     pub unsafe fn update_presentation(&mut self, window: &Window) {
+        println!("update_presentation");
         self.device.device_wait_idle().unwrap();
 
+        // SECTION : Destroy old framebuffers
         for image_view in &self.presentation.swapchain.image_views {
             self.device.destroy_image_view(*image_view, None);
         }
 
-        let old_swapchain_khr = self.presentation.swapchain.swapchain;
-        self.presentation.swapchain = create_swapchain(
-            &self.presentation.swapchain_loader,
-            self.presentation.surface,
-            &self.device,
-            &self.presentation.surface_caps,
-            self.presentation.format,
-            self.presentation.queue_family_index,
-            self.presentation.swapchain.swapchain,
-        );
-
+        // SECTION : Destroy old swapchain
         self.presentation
             .swapchain_loader
-            .destroy_swapchain(old_swapchain_khr, None);
+            .destroy_swapchain(self.presentation.swapchain.swapchain, None);
 
-        for i in 0..self.presentation.framebuffers.len() {
-            self.device
-                .destroy_framebuffer(self.presentation.framebuffers[i], None);
+        // SECTION : New size
+        let width = window.inner_size().width;
+        let height = window.inner_size().height;
 
-            self.presentation.framebuffers[i] = create_framebuffer(
-                &self.device,
-                self.presentation.swapchain.image_views[i],
-                self.render_pass,
-                self.presentation.surface_caps.current_extent.width,
-                self.presentation.surface_caps.current_extent.height,
-            );
-        }
+        // SECTION : Create new surface loader
+        let surface_loader = khr::Surface::new(&self.entry, &self.instance);
+
+        // SECTION : Create new presentation
+        self.presentation = Presentation::new(
+            surface_loader,
+            self.presentation.surface,
+            &self.instance,
+            self.physical_device,
+            &self.device,
+            self.presentation.queue_family_index,
+            self.presentation.image_available_semaphore,
+            self.presentation.render_finished_semaphore,
+            width,
+            height,
+        );
+
+        // SECTION : Create new framebuffers
+        self.create_framebuffers();
     }
 
     pub fn draw(&mut self, window: &Window) {
@@ -296,17 +309,18 @@ impl Engine {
                 .unwrap();
 
             // SECTION : Acquire next image
-            let rendered_image_index = self
-                .presentation
-                .swapchain_loader
-                .acquire_next_image(
+            let rendered_image_index = loop {
+                match self.presentation.swapchain_loader.acquire_next_image(
                     self.presentation.swapchain.swapchain,
                     std::u64::MAX,
                     self.presentation.image_available_semaphore,
                     vk::Fence::null(),
-                )
-                .expect("Can't acquire Vulkan swapchain image.")
-                .0;
+                ) {
+                    Ok((index, _)) => break index,
+                    Err(vk::Result::ERROR_OUT_OF_DATE_KHR) => self.update_presentation(&window),
+                    Err(error) => panic!("Can't acquire next image: {:?}", error),
+                }
+            };
 
             // SECTION : Begin command buffer
             let command_buffer_begin_info = vk::CommandBufferBeginInfo {
@@ -664,20 +678,18 @@ fn create_swapchain(
     format: vk::Format,
     family_index: u32,
     old_swapchain: vk::SwapchainKHR,
+    width: u32,
+    height: u32,
 ) -> Swapchain {
     unsafe {
         let composite_alpha = get_surface_composite_alpha(&surface_caps);
-        let image_extent = vk::Extent2D {
-            width: surface_caps.current_extent.width,
-            height: surface_caps.current_extent.height,
-        };
 
         let create_info = vk::SwapchainCreateInfoKHR {
             surface: surface,
             min_image_count: std::cmp::max(2, surface_caps.min_image_count),
             image_format: format,
             image_color_space: vk::ColorSpaceKHR::SRGB_NONLINEAR,
-            image_extent: image_extent,
+            image_extent: vk::Extent2D { width, height },
             image_array_layers: 1,
             image_usage: vk::ImageUsageFlags::COLOR_ATTACHMENT,
             queue_family_index_count: 1,
