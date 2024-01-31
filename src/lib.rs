@@ -266,12 +266,9 @@ impl Engine {
         let width = window.inner_size().width;
         let height = window.inner_size().height;
 
-        // SECTION : Create new surface loader
-        let surface_loader = khr::Surface::new(&self.entry, &self.instance);
-
         // SECTION : Create new presentation
         self.presentation = Presentation::new(
-            surface_loader,
+            self.presentation.surface_loader.clone(), // FIX : Can be improved
             self.presentation.surface,
             &self.instance,
             self.physical_device,
