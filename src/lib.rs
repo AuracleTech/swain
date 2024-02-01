@@ -14,7 +14,6 @@ const CLEAR_COLOR: [ash::vk::ClearValue; 1] = [vk::ClearValue {
 }];
 
 pub struct Presentation {
-    surface_loader: khr::Surface,
     surface: vk::SurfaceKHR,
     surface_caps: vk::SurfaceCapabilitiesKHR,
     format: vk::Format,
@@ -28,7 +27,7 @@ pub struct Presentation {
 
 impl Presentation {
     pub fn new(
-        surface_loader: khr::Surface,
+        surface_loader: &khr::Surface,
         surface: vk::SurfaceKHR,
         instance: &ash::Instance,
         physical_device: vk::PhysicalDevice,
@@ -60,7 +59,6 @@ impl Presentation {
         );
 
         Presentation {
-            surface_loader,
             surface,
             surface_caps,
             format,
@@ -81,8 +79,10 @@ pub struct Swapchain {
 }
 
 pub struct Engine {
+    pub window: Window,
     instance: ash::Instance,
-    entry: ash::Entry,
+    _entry: ash::Entry,
+    surface_loader: khr::Surface,
     physical_device: vk::PhysicalDevice,
     device: ash::Device,
     graphics_queue: vk::Queue,
@@ -95,6 +95,7 @@ pub struct Engine {
     _pipeline_layout: vk::PipelineLayout,
     graphics_pipeline: vk::Pipeline,
     command_buffer_index: usize,
+    outdated_presentation: bool,
 }
 
 impl Engine {
@@ -103,7 +104,7 @@ impl Engine {
         win_title: &str,
         win_init_width: u32,
         win_init_height: u32,
-    ) -> (Self, Window, EventLoop<()>) {
+    ) -> (Self, EventLoop<()>) {
         // SECTION : Create window
         let event_loop = EventLoop::new();
         let window = WindowBuilder::new()
@@ -170,7 +171,7 @@ impl Engine {
 
             // SECTION : Create swapchain
             let presentation = Presentation::new(
-                surface_loader,
+                &surface_loader,
                 surface,
                 &instance,
                 physical_device,
@@ -214,8 +215,10 @@ impl Engine {
 
             // SECTION : Create engine
             let mut engine = Engine {
+                window,
                 instance,
-                entry,
+                _entry: entry,
+                surface_loader,
                 physical_device,
                 device,
                 graphics_queue,
@@ -227,12 +230,13 @@ impl Engine {
                 _pipeline_layout: pipeline_layout,
                 graphics_pipeline,
                 command_buffer_index: 0,
+                outdated_presentation: false,
             };
 
             // SECTION : Create framebuffers
             engine.create_framebuffers();
 
-            (engine, window, event_loop)
+            (engine, event_loop)
         }
     }
 
@@ -248,9 +252,17 @@ impl Engine {
         }
     }
 
-    pub unsafe fn update_presentation(&mut self, window: &Window) {
-        println!("update_presentation");
+    pub unsafe fn update_presentation(&mut self) {
         self.device.device_wait_idle().unwrap();
+
+        let width = self.window.inner_size().width;
+        let height = self.window.inner_size().height;
+
+        if width <= 0 || height <= 0 {
+            return;
+        }
+
+        println!("updating presentation to {:?} x {:?}", width, height);
 
         // SECTION : Destroy old framebuffers
         for image_view in &self.presentation.swapchain.image_views {
@@ -262,13 +274,9 @@ impl Engine {
             .swapchain_loader
             .destroy_swapchain(self.presentation.swapchain.swapchain, None);
 
-        // SECTION : New size
-        let width = window.inner_size().width;
-        let height = window.inner_size().height;
-
         // SECTION : Create new presentation
         self.presentation = Presentation::new(
-            self.presentation.surface_loader.clone(), // FIX : Can be improved
+            &self.surface_loader,
             self.presentation.surface,
             &self.instance,
             self.physical_device,
@@ -282,14 +290,22 @@ impl Engine {
 
         // SECTION : Create new framebuffers
         self.create_framebuffers();
+
+        self.outdated_presentation = false;
     }
 
-    pub fn draw(&mut self, window: &Window) {
-        let width = self.presentation.surface_caps.current_extent.width;
-        let height = self.presentation.surface_caps.current_extent.height;
+    pub fn draw(&mut self) {
+        let width = self.window.inner_size().width;
+        let height = self.window.inner_size().height;
 
         if width <= 0 || height <= 0 {
             return;
+        }
+
+        if self.outdated_presentation {
+            unsafe {
+                self.update_presentation();
+            }
         }
 
         unsafe {
@@ -314,7 +330,10 @@ impl Engine {
                     vk::Fence::null(),
                 ) {
                     Ok((index, _)) => break index,
-                    Err(vk::Result::ERROR_OUT_OF_DATE_KHR) => self.update_presentation(&window),
+                    Err(vk::Result::ERROR_OUT_OF_DATE_KHR) => {
+                        self.outdated_presentation = true;
+                        return self.draw();
+                    }
                     Err(error) => panic!("Can't acquire next image: {:?}", error),
                 }
             };
@@ -496,7 +515,10 @@ impl Engine {
                 Ok(_) => {
                     self.command_buffer_index = (self.command_buffer_index + 1) % 2;
                 }
-                Err(vk::Result::ERROR_OUT_OF_DATE_KHR) => self.update_presentation(&window),
+                Err(vk::Result::ERROR_OUT_OF_DATE_KHR) => {
+                    self.outdated_presentation = true;
+                    return self.draw();
+                }
                 Err(error) => panic!("Can't present queue: {:?}", error),
             }
         }
