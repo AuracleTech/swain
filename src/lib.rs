@@ -1,6 +1,7 @@
 use ash::extensions::khr;
 use ash::vk;
 use presentation::Presentation;
+use raw_window_handle::{HasRawDisplayHandle, HasRawWindowHandle};
 use winit::event_loop::EventLoop;
 use winit::window::{Window, WindowBuilder};
 
@@ -96,8 +97,14 @@ impl Engine {
 
             // SECTION : Create Vulkan surface
             let surface_loader = khr::Surface::new(&entry, &instance);
-            let surface = ash_window::create_surface(&entry, &instance, &window, None)
-                .expect("Can't create surface.");
+            let surface = ash_window::create_surface(
+                &entry,
+                &instance,
+                window.raw_display_handle(),
+                window.raw_window_handle(),
+                None,
+            )
+            .expect("Can't create surface.");
 
             // SECTION : Pick physical device
             let physical_device = pick_physical_device(&instance, surface, &surface_loader);
