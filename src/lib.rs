@@ -252,6 +252,7 @@ impl Engine {
         }
     }
 
+    #[inline]
     pub unsafe fn update_presentation(&mut self) {
         self.device.device_wait_idle().unwrap();
 
@@ -655,11 +656,9 @@ pub fn create_device(
             ..Default::default()
         };
 
-        let device = instance
+        instance
             .create_device(physical_device, &create_info, None)
-            .expect("Can't create Vulkan device.");
-
-        device
+            .expect("Can't create Vulkan device.")
     }
 }
 
@@ -724,7 +723,9 @@ fn create_swapchain(
             .create_swapchain(&create_info, None)
             .expect("Can't create Vulkan swapchain.");
 
-        let images = get_swapchain_images(swapchain, &swapchain_loader);
+        let images = swapchain_loader
+            .get_swapchain_images(swapchain)
+            .expect("Can't get Vulkan swapchain images.");
 
         let mut image_views: Vec<vk::ImageView> = Vec::with_capacity(images.len());
         for image in &images {
@@ -738,19 +739,6 @@ fn create_swapchain(
             images,
             image_views,
         }
-    }
-}
-
-fn get_swapchain_images(
-    swapchain: vk::SwapchainKHR,
-    swapchain_loader: &khr::Swapchain,
-) -> Vec<vk::Image> {
-    unsafe {
-        let swapchain_images = swapchain_loader
-            .get_swapchain_images(swapchain)
-            .expect("Can't get Vulkan swapchain images.");
-
-        swapchain_images
     }
 }
 
@@ -773,11 +761,9 @@ fn create_image_view(
             ..Default::default()
         };
 
-        let image_view = device
+        device
             .create_image_view(&image_view_create_info, None)
-            .expect("Can't create Vulkan image view.");
-
-        image_view
+            .expect("Can't create Vulkan image view.")
     }
 }
 
@@ -816,11 +802,9 @@ pub fn create_command_pool(device: &ash::Device, family_index: u32) -> vk::Comma
             ..Default::default()
         };
 
-        let command_pool = device
+        device
             .create_command_pool(&create_info, None)
-            .expect("Can't create Vulkan command pool.");
-
-        command_pool
+            .expect("Can't create Vulkan command pool.")
     }
 }
 
@@ -837,22 +821,18 @@ pub fn allocate_command_buffers(
             ..Default::default()
         };
 
-        let command_buffers = device
+        device
             .allocate_command_buffers(&allocate_info)
-            .expect("Can't allocate Vulkan command buffers.");
-
-        command_buffers
+            .expect("Can't allocate Vulkan command buffers.")
     }
 }
 
 pub fn create_semaphore(device: &ash::Device) -> vk::Semaphore {
     unsafe {
         let create_info = vk::SemaphoreCreateInfo::default();
-        let semaphore = device
+        device
             .create_semaphore(&create_info, None)
-            .expect("Can't create Vulkan semaphore.");
-
-        semaphore
+            .expect("Can't create Vulkan semaphore.")
     }
 }
 
@@ -863,11 +843,9 @@ pub fn create_fence(device: &ash::Device) -> vk::Fence {
             ..Default::default()
         };
 
-        let fence = device
+        device
             .create_fence(&create_info, None)
-            .expect("Can't create Vulkan fence.");
-
-        fence
+            .expect("Can't create Vulkan fence.")
     }
 }
 
@@ -905,11 +883,9 @@ pub fn create_render_pass(device: &ash::Device, swapchain_format: vk::Format) ->
             ..Default::default()
         };
 
-        let render_pass = device
+        device
             .create_render_pass(&create_info, None)
-            .expect("Can't create Vulkan render pass.");
-
-        render_pass
+            .expect("Can't create Vulkan render pass.")
     }
 }
 
@@ -923,11 +899,9 @@ pub fn load_shader(device: &ash::Device, path: &str) -> vk::ShaderModule {
             ..Default::default()
         };
 
-        let shader_module = device
+        device
             .create_shader_module(&shader_module_create_info, None)
-            .expect("Can't create Vulkan shader module.");
-
-        shader_module
+            .expect("Can't create Vulkan shader module.")
     }
 }
 
@@ -937,11 +911,9 @@ pub fn create_pipeline_layout(device: &ash::Device) -> vk::PipelineLayout {
             ..Default::default()
         };
 
-        let pipeline_layout = device
+        device
             .create_pipeline_layout(&pipeline_layout_create_info, None)
-            .expect("Can't create Vulkan pipeline layout.");
-
-        pipeline_layout
+            .expect("Can't create Vulkan pipeline layout.")
     }
 }
 
@@ -1040,10 +1012,8 @@ pub fn create_graphics_pipeline(
             ..Default::default()
         };
 
-        let graphics_pipeline = device
+        device
             .create_graphics_pipelines(vk::PipelineCache::null(), &[create_info], None)
-            .expect("Can't create Vulkan graphics pipeline.");
-
-        graphics_pipeline[0]
+            .expect("Can't create Vulkan graphics pipeline.")[0]
     }
 }
