@@ -5,8 +5,8 @@ use winit::{
 
 const APP_VERSION: u32 = 30012024;
 const WIN_TITLE: &'static str = env!("CARGO_PKG_NAME");
-const WIN_INIT_WIDTH: u32 = 1280;
-const WIN_INIT_HEIGHT: u32 = 720;
+const WIN_INIT_WIDTH: u32 = 512;
+const WIN_INIT_HEIGHT: u32 = 512;
 
 fn main() {
     let (mut engine, event_loop) =
@@ -28,7 +28,7 @@ fn main() {
                 } => *control_flow = ControlFlow::Exit,
                 _ => (),
             },
-            Event::MainEventsCleared => engine.window.request_redraw(),
+            // Event::MainEventsCleared => engine.window.request_redraw(),
             Event::RedrawRequested(_) => engine.draw(),
             _ => (),
         }

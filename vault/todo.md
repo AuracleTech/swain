@@ -1,3 +1,15 @@
+```rs
+// THIS COULD BE STORED IN ENGINE STRUCT
+// UNLESS GPU CHANGES OR MEMORY CHANGES ETC
+// THEN WE WOULD HAVE TO UPDATE IT
+
+// THEN REMOVE DUPES
+
+let device_memory_properties = engine
+.instance
+.get_physical_device_memory_properties(physical_device);
+```
+
 1. [x] **Core Rendering Engine:**
 
    - [x] Vulkan rendering for a single triangle.
