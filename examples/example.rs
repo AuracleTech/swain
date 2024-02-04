@@ -9,7 +9,7 @@ const WIN_INIT_WIDTH: u32 = 512;
 const WIN_INIT_HEIGHT: u32 = 512;
 
 fn main() {
-    let (mut engine, event_loop) =
+    let (engine, event_loop) =
         swain::Engine::new(APP_VERSION, WIN_TITLE, WIN_INIT_WIDTH, WIN_INIT_HEIGHT);
 
     event_loop.run(move |event, _, control_flow| {
@@ -29,7 +29,7 @@ fn main() {
                 _ => (),
             },
             // Event::MainEventsCleared => engine.window.request_redraw(),
-            Event::RedrawRequested(_) => engine.draw(),
+            Event::RedrawRequested(_) => unsafe { engine.draw() },
             _ => (),
         }
     });
