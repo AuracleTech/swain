@@ -6,7 +6,7 @@ use winit::{
 };
 
 const APP_VERSION: u32 = 30012024;
-const WIN_TITLE: &'static str = env!("CARGO_PKG_NAME");
+const WIN_TITLE: &str = env!("CARGO_PKG_NAME");
 const WIN_INIT_WIDTH: u32 = 512;
 const WIN_INIT_HEIGHT: u32 = 512;
 

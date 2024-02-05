@@ -261,8 +261,8 @@ impl Engine {
 
             let surface_resolution = match surface_caps.current_extent.width {
                 u32::MAX => vk::Extent2D {
-                    width: width,
-                    height: height,
+                    width,
+                    height,
                 },
                 _ => surface_caps.current_extent,
             };
@@ -1487,7 +1487,7 @@ pub unsafe fn record_submit_commandbuffer<F: FnOnce(&ash::Device, vk::CommandBuf
         .end_command_buffer(command_buffer)
         .expect("End commandbuffer");
 
-    let command_buffers = vec![command_buffer];
+    let command_buffers = [command_buffer];
 
     let submit_info = ash::vk::SubmitInfo {
         wait_semaphore_count: wait_semaphores.len() as u32,
