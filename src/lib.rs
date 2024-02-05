@@ -14,10 +14,10 @@ const NAME: &[u8] = env!("CARGO_PKG_NAME").as_bytes();
 const VERSION: u32 = vk::make_api_version(0, 1, 0, 0);
 const API_VERSION: u32 = vk::make_api_version(0, 1, 0, 0);
 const SHADERS_PATH: &str = "data/shaders/";
-const FPS_TARGET: u16 = 5;
+const FPS_TARGET: usize = 5;
 
 lazy_static::lazy_static! {
-pub static ref DRAW_TIME_MAX: Duration = Duration::from_secs_f64(1.0 / f64::from(FPS_TARGET));
+pub static ref DRAW_TIME_MAX: Duration = Duration::from_secs_f64(1.0 / FPS_TARGET as f64);
 }
 
 #[macro_export]
@@ -29,28 +29,6 @@ macro_rules! offset_of {
             std::ptr::addr_of!(b.$field) as isize - std::ptr::addr_of!(b) as isize
         }
     }};
-}
-
-struct FpsCounter {
-    frame_start: Instant,
-}
-
-impl FpsCounter {
-    fn new() -> Self {
-        FpsCounter {
-            frame_start: Instant::now(),
-        }
-    }
-
-    fn draw_start(&mut self) {
-        self.frame_start = Instant::now();
-    }
-
-    fn draw_end(&mut self) {
-        let elapsed = (Instant::now() - self.frame_start).as_millis() as f64;
-        info!("draw {:.2} ms", elapsed);
-        self.frame_start = Instant::now();
-    }
 }
 
 #[derive(Clone, Debug, Copy)]
@@ -104,8 +82,10 @@ pub struct Engine {
     draw_commands_reuse_fence: vk::Fence,
     setup_commands_reuse_fence: vk::Fence,
 
-    fps_counter: FpsCounter,
-    pub last_frame_present_time: Instant,
+    pub last_frame_time: Instant,
+
+    draw_durations_index: usize,
+    draw_durations: [Duration; FPS_TARGET],
 }
 
 impl Engine {
@@ -510,8 +490,6 @@ impl Engine {
                 .create_semaphore(&semaphore_create_info, None)
                 .unwrap();
 
-            let fps_counter = FpsCounter::new();
-
             let engine = Self {
                 entry,
                 instance,
@@ -540,8 +518,9 @@ impl Engine {
                 setup_commands_reuse_fence,
                 surface_khr,
                 depth_image_memory,
-                fps_counter,
-                last_frame_present_time: Instant::now(),
+                last_frame_time: Instant::now(),
+                draw_durations_index: 0,
+                draw_durations: [Duration::from_secs(1 / FPS_TARGET as u64); FPS_TARGET],
             };
 
             (engine, event_loop)
@@ -549,7 +528,7 @@ impl Engine {
     }
 
     pub unsafe fn draw(&mut self) {
-        self.fps_counter.draw_start();
+        let frame_start_time = Instant::now();
         // SECTION : Render pass
         let attachment_description = [
             vk::AttachmentDescription {
@@ -1276,7 +1255,7 @@ impl Engine {
         let width = self.window.inner_size().width;
         let height = self.window.inner_size().height;
 
-        if width <= 0 || height <= 0 {
+        if width == 0 || height == 0 {
             return;
         }
 
@@ -1361,8 +1340,6 @@ impl Engine {
                     0,
                     1,
                 );
-                // Or draw without the index buffer
-                // device.cmd_draw(draw_command_buffer, 3, 1, 0, 0);
 
                 device.cmd_end_render_pass(draw_command_buffer);
             },
@@ -1378,8 +1355,9 @@ impl Engine {
         self.swapchain_loader
             .queue_present(self.present_queue, &present_info)
             .unwrap();
-        self.last_frame_present_time = Instant::now();
+        self.last_frame_time = Instant::now();
 
+        // SECTION : Clean up
         self.device.device_wait_idle().unwrap();
 
         for pipeline in graphics_pipelines {
@@ -1412,7 +1390,21 @@ impl Engine {
         }
         self.device.destroy_render_pass(render_pass, None);
 
-        self.fps_counter.draw_end();
+        // SECTION : Frame counter
+        let current_draw_duration = frame_start_time.elapsed();
+
+        self.draw_durations[self.draw_durations_index] = current_draw_duration;
+        self.draw_durations_index = (self.draw_durations_index + 1) % FPS_TARGET;
+
+        let total_duration: Duration = self.draw_durations.iter().sum();
+        let average_duration = total_duration / FPS_TARGET as u32;
+
+        info!(
+            "draw {:.2} ms | average draw {:.2} ms | FPS estimated without cap {:.2}",
+            current_draw_duration.as_micros() as f64 / 1000.0,
+            average_duration.as_micros() as f64 / 1000.0,
+            1000.0 / (average_duration.as_micros() as f64 / 1000.0),
+        );
     }
 }
 

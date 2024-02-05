@@ -14,17 +14,18 @@ fn main() {
     let (mut engine, event_loop) =
         swain::Engine::new(APP_VERSION, WIN_TITLE, WIN_INIT_WIDTH, WIN_INIT_HEIGHT);
 
-    let drawing = Arc::new(Mutex::new(true));
-    let drawing_clone = Arc::clone(&drawing);
+    let rendering = Arc::new(Mutex::new(true));
+    let rendering_arc = Arc::clone(&rendering);
+    let rendering_mt = *rendering_arc.lock().unwrap();
 
     let _handle = std::thread::spawn(move || loop {
-        if *drawing_clone.lock().unwrap() {
+        if rendering_mt {
             unsafe {
                 engine.draw();
             }
         }
 
-        let elapsed = engine.last_frame_present_time.elapsed();
+        let elapsed = engine.last_frame_time.elapsed();
         if elapsed > *swain::DRAW_TIME_MAX {
             warn!(
                 "late by {} ms, restating frame immediately",
@@ -54,8 +55,8 @@ fn main() {
             },
             // Event::MainEventsCleared => engine.window.request_redraw(),
             Event::RedrawRequested(_) => {
-                // let mut lock = drawing.lock().unwrap();
-                // *lock = false;
+                let mut lock = rendering.lock().unwrap();
+                *lock = false;
             }
             _ => (),
         }
