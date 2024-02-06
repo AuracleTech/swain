@@ -1393,48 +1393,7 @@ impl Engine {
     }
 }
 
-pub fn get_graphics_family_index(
-    instance: &ash::Instance,
-    physical_device: vk::PhysicalDevice,
-) -> u32 {
-    unsafe {
-        let queue_family_properties =
-            instance.get_physical_device_queue_family_properties(physical_device);
-
-        for i in 0..queue_family_properties.len() {
-            if queue_family_properties[i]
-                .queue_flags
-                .contains(vk::QueueFlags::GRAPHICS)
-            {
-                return i as u32;
-            }
-        }
-
-        vk::QUEUE_FAMILY_IGNORED
-    }
-}
-
-pub fn create_semaphore(device: &ash::Device) -> vk::Semaphore {
-    unsafe {
-        let create_info = vk::SemaphoreCreateInfo::default();
-        device
-            .create_semaphore(&create_info, None)
-            .expect("Can't create Vulkan semaphore.")
-    }
-}
-
-pub unsafe fn create_fence(device: &ash::Device) -> vk::Fence {
-    let fence_create_info = vk::FenceCreateInfo {
-        flags: vk::FenceCreateFlags::SIGNALED,
-        ..Default::default()
-    };
-
-    device
-        .create_fence(&fence_create_info, None)
-        .expect("Can't create Vulkan fence.")
-}
-
-pub unsafe fn record_submit_commandbuffer<F: FnOnce(&ash::Device, vk::CommandBuffer)>(
+unsafe fn record_submit_commandbuffer<F: FnOnce(&ash::Device, vk::CommandBuffer)>(
     device: &ash::Device,
     command_buffer: vk::CommandBuffer,
     command_buffer_reuse_fence: vk::Fence,
