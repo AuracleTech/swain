@@ -1490,7 +1490,7 @@ pub fn compile_shaders() -> Result<()> {
     Ok(())
 }
 
-pub fn find_memorytype_index(
+fn find_memorytype_index(
     memory_req: &vk::MemoryRequirements,
     memory_prop: &vk::PhysicalDeviceMemoryProperties,
     flags: vk::MemoryPropertyFlags,
