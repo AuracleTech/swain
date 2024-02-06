@@ -14,7 +14,7 @@ const NAME: &[u8] = env!("CARGO_PKG_NAME").as_bytes();
 const VERSION: u32 = vk::make_api_version(0, 1, 0, 0);
 const API_VERSION: u32 = vk::make_api_version(0, 1, 0, 0);
 const SHADERS_PATH: &str = "data/shaders/";
-const FPS_TARGET: usize = 5;
+const FPS_TARGET: usize = 15;
 
 lazy_static::lazy_static! {
 pub static ref DRAW_TIME_MAX: Duration = Duration::from_secs_f64(1.0 / FPS_TARGET as f64);
@@ -83,9 +83,6 @@ pub struct Engine {
     setup_commands_reuse_fence: vk::Fence,
 
     pub last_frame_time: Instant,
-
-    draw_durations_index: usize,
-    draw_durations: [Duration; FPS_TARGET],
 }
 
 impl Engine {
@@ -260,10 +257,7 @@ impl Engine {
             }
 
             let surface_resolution = match surface_caps.current_extent.width {
-                u32::MAX => vk::Extent2D {
-                    width,
-                    height,
-                },
+                u32::MAX => vk::Extent2D { width, height },
                 _ => surface_caps.current_extent,
             };
             let pre_transform = if surface_caps
@@ -519,8 +513,6 @@ impl Engine {
                 surface_khr,
                 depth_image_memory,
                 last_frame_time: Instant::now(),
-                draw_durations_index: 0,
-                draw_durations: [Duration::from_secs(1 / FPS_TARGET as u64); FPS_TARGET],
             };
 
             (engine, event_loop)
@@ -1393,17 +1385,10 @@ impl Engine {
         // SECTION : Frame counter
         let current_draw_duration = frame_start_time.elapsed();
 
-        self.draw_durations[self.draw_durations_index] = current_draw_duration;
-        self.draw_durations_index = (self.draw_durations_index + 1) % FPS_TARGET;
-
-        let total_duration: Duration = self.draw_durations.iter().sum();
-        let average_duration = total_duration / FPS_TARGET as u32;
-
         info!(
-            "draw {:.2} ms | average draw {:.2} ms | FPS estimated without cap {:.2}",
+            "draw {:.2} ms | estimated FPS without cap {:.2}",
             current_draw_duration.as_micros() as f64 / 1000.0,
-            average_duration.as_micros() as f64 / 1000.0,
-            1000.0 / (average_duration.as_micros() as f64 / 1000.0),
+            1_000_000.0 / current_draw_duration.as_micros() as f64
         );
     }
 }
