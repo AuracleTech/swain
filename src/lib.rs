@@ -1449,7 +1449,7 @@ unsafe fn record_submit_commandbuffer<F: FnOnce(&ash::Device, vk::CommandBuffer)
         .expect("queue submit failed.");
 }
 
-pub fn compile_shaders() -> Result<()> {
+fn compile_shaders() -> Result<()> {
     if Path::new(SHADERS_PATH).exists() {
         let files = std::fs::read_dir(SHADERS_PATH)?;
         for file in files {
