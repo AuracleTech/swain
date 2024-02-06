@@ -45,7 +45,7 @@ pub struct Vector3 {
     pub _pad: f32,
 }
 
-#[allow(dead_code)]
+#[allow(unused)]
 pub struct Engine {
     entry: ash::Entry,
     instance: ash::Instance,
