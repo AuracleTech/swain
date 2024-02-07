@@ -565,6 +565,16 @@ impl Engine {
         self.present_images.clear();
     }
 
+    pub unsafe fn cleanup_surface(&mut self) {
+        self.cleanup_swapchain();
+
+        // TODO : CLEANUP SURFACE
+    }
+
+    pub unsafe fn create_surface(&mut self) {
+        // TODO : CREATE SURFACE
+    }
+
     pub unsafe fn draw(&mut self) {
         let frame_start_time = Instant::now();
         // SECTION : Render pass
