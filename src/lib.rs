@@ -521,6 +521,50 @@ impl Engine {
         }
     }
 
+    unsafe fn cleanup_swapchain(&mut self) {
+        // Semaphores
+        self.device
+            .destroy_semaphore(self.rendering_complete_semaphore, None);
+        self.device
+            .destroy_semaphore(self.present_complete_semaphore, None);
+        self.present_complete_semaphore = vk::Semaphore::null(); // Reset semaphores to null after destruction
+        self.rendering_complete_semaphore = vk::Semaphore::null();
+
+        // Fences
+        self.device
+            .destroy_fence(self.setup_commands_reuse_fence, None);
+        self.device
+            .destroy_fence(self.draw_commands_reuse_fence, None);
+        self.setup_commands_reuse_fence = vk::Fence::null();
+        self.draw_commands_reuse_fence = vk::Fence::null();
+
+        // Command buffers
+        self.device.free_command_buffers(
+            self.command_pool,
+            &[self.draw_command_buffer, self.setup_command_buffer],
+        );
+        self.draw_command_buffer = vk::CommandBuffer::null();
+        self.setup_command_buffer = vk::CommandBuffer::null();
+
+        // Swapchain image views
+        for present_image_view in &self.present_image_views {
+            self.device.destroy_image_view(*present_image_view, None);
+        }
+        self.present_image_views.clear();
+
+        // Depth image resources
+        self.device.destroy_image_view(self.depth_image_view, None);
+        self.device.free_memory(self.depth_image_memory, None);
+        self.device.destroy_image(self.depth_image, None);
+
+        // Swapchain
+        self.swapchain_loader
+            .destroy_swapchain(self.swapchain_khr, None);
+
+        // Present images
+        self.present_images.clear();
+    }
+
     pub unsafe fn draw(&mut self) {
         let frame_start_time = Instant::now();
         // SECTION : Render pass
