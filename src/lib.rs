@@ -63,6 +63,7 @@ pub struct Engine {
     surface_format_khr: vk::SurfaceFormatKHR,
     surface_image_format: vk::Format,
     surface_resolution: vk::Extent2D,
+    surface_caps: vk::SurfaceCapabilitiesKHR,
 
     swapchain_khr: vk::SwapchainKHR,
     present_images: Vec<vk::Image>,
@@ -499,6 +500,7 @@ impl Engine {
                 surface_resolution,
                 swapchain_loader,
                 swapchain_khr,
+                surface_caps,
                 present_images,
                 present_image_views,
                 command_pool,
